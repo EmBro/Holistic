@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html ng-app="ReportPage" id="ng-app">
+<head>
+    <meta charset="utf-8">
+	<meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="initial-scale=1.0, user-scalable=no" />
+    <title>Report</title>
+    <link href="libs/bootstrap/css/bootstrap.min.css" rel="stylesheet" media="screen">
+    <style type="text/css">
+		
+.box-row1 {
+    padding-bottom: 0px;
+    padding-left: 20px;
+    padding-right: 20px;
+    padding-top: 20px;
+}
+
+.box-row2 {
+    padding: 20px;
+}
+
+.reportTable {
+    width: 80%;
+    margin: auto;
+}
+
+.indicator-selection-combo {
+    width: 300px;
+    margin: auto;
+}
+
+#indicatorSelection {
+    max-width: 400px;
+    margin-bottom: 25px;
+}	
+    </style>
+</head>
+
+<body>
+	
+	<div id="contentDiv" data-ng-controller="Controller" style="max-width: 1000px; margin: auto">
+		<div class="container-fluid" style="margin:20px">
+			<div class="row">
+				<h1 class="col-sm-12 box-row1" style="text-align: center">{{report.title}}</h1>
+			</div>
+			<div class="row">
+				<div data-ng-repeat="section in report.sections" class="col-sm-12 box-row1">
+					<h3 style="text-align: center">{{section.title}}</h3>
+					<p style="text-align: justify" data-ng-bind-html="section.text"></p>
+					
+                    <div data-ng-if="section.componentId === 'variant_description_table'">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.Variant}}</th>
+				<th>{{Messages.Description}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="variant in report.variants">
+				<td>{{variant.name}}</td>
+				<td>{{variant.description}}</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+					</div>
+					
+					<div data-ng-if="section.componentId === 'indicator_description_table'">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.ImpactCategory}}</th>
+				<th>{{Messages.Unit}}</th>
+				<th>{{Messages.Description}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="indicator in report.indicators| filter: {displayed:true}">
+				<td>{{indicator.reportName}}</td>
+				<td>{{indicator.descriptor.referenceUnit}}</td>
+				<td>{{indicator.reportDescription}}</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+					</div>
+					
+                    <div data-ng-if="section.componentId === 'parameter_description_table'">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.Parameter}}</th>
+				<th>{{Messages.Description}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="parameter in report.parameters">
+				<td>{{parameter.name}}</td>
+				<td>{{parameter.description}}</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+					</div>
+					
+                    <div data-ng-if="section.componentId === 'parameter_value_table'">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.Parameter}}</th>
+				<th data-ng-repeat="variant in report.variants">{{variant.name}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="parameter in report.parameters">
+				<td>{{parameter.name}}</td>
+				<td data-ng-repeat="variant in report.variants">{{parameter.variantValues[variant.id]}}</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+					</div>
+					
+					<div data-ng-if="section.componentId === 'process_contribution_chart'">
+						<div style="margin: 20px">
+	<select 
+		class="form-control indicator-selection-combo" 
+		data-ng-options="indicator.reportName for indicator in getDisplayedIndicators()" 
+		data-ng-model="selectedContributionIndicator">
+	</select>
+</div>
+<div style="width: 650px; margin: auto;">	
+	<canvas 
+		data-contribution-chart 
+		width="650" 
+		height="400">		
+	</canvas>
+	<div data-contribution-legend
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>	
+					</div>
+					
+					<div data-ng-if="section.componentId === 'impact_result_table'">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.ImpactCategory}}</th>
+				<th data-ng-repeat="variant in report.variants">{{variant.name}}</th>
+				<th>{{Messages.Unit}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="indicator in report.indicators| filter: {displayed:true}">
+				<td>
+					{{indicator.reportName}}
+				</td>
+				<td data-ng-repeat="variant in report.variants">
+					{{getVariantResult(variant, indicator) | scientific}}
+				</td>
+				<td>
+					{{indicator.descriptor.referenceUnit}}
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>	
+					</div>
+					
+                    <div data-ng-if="section.componentId === 'normalisation_result_table' && report.withNormalisation">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.ImpactCategory}}</th>
+				<th data-ng-repeat="variant in report.variants">{{variant.name}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="indicator in report.indicators| filter: {displayed:true}">
+				<td>
+					{{indicator.reportName}}
+				</td>
+				<td data-ng-repeat="variant in report.variants">
+					{{getVariantResult(variant, indicator) / indicator.normalisationFactor | scientific}}
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>	
+					</div>
+					
+                    <div data-ng-if="section.componentId === 'single_score_table' && report.withWeighting">
+						<div class="table-responsive">
+	<table class="table table-hover reportTable">
+		<thead>
+			<tr>
+				<th>{{Messages.ImpactCategory}}</th>
+				<th data-ng-repeat="variant in report.variants">{{variant.name}}</th>
+			</tr>
+		</thead>
+		<tbody>
+			<tr data-ng-repeat="indicator in report.indicators| filter: {displayed:true}">
+				<td>
+					{{indicator.reportName}}
+				</td>
+				<td data-ng-repeat="variant in report.variants">
+					{{(indicator.weightingFactor * getVariantResult(variant, indicator)) / indicator.normalisationFactor | scientific}}
+				</td>
+			</tr>
+			<tr>
+				<td><b>{{Messages.Sum}}</b></td>
+				<td data-ng-repeat="variant in report.variants">
+					<b>{{getSingleScore(variant) | scientific}}</b>
+				</td>
+			</tr>
+		</tbody>
+	</table>
+</div>
+					</div>
+					
+					<div data-ng-if="section.componentId === 'indicator_bar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<select title="{{Messages.ImpactCategory}}"
+		id="indicatorSelection" 
+		class="form-control indicator-selection-combo" 
+		data-ng-options="indicator.reportName for indicator in getDisplayedIndicators()" 
+		data-ng-model="selectedBarChartIndicator">
+	</select>
+	<canvas 
+			data-indicator-bar-chart 
+			width="650" 
+			height="400">		
+	</canvas>
+</div>
+	
+					</div>
+					
+					<div data-ng-if="section.componentId === 'relative_indicator_bar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<canvas 
+			data-normalised-indicator-chart="relative_bar" 
+			width="650" 
+			height="400">		
+	</canvas>
+	<div data-variant-legend 
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>
+
+					</div>
+					
+					<div data-ng-if="section.componentId === 'normalisation_bar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<canvas 
+			data-normalised-indicator-chart="normalisation_bar" 
+			width="650" 
+			height="400">		
+	</canvas>
+	<div data-variant-legend 
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>
+	
+					</div>
+					
+					<div data-ng-if="section.componentId === 'relative_indicator_radar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<canvas 
+			data-normalised-indicator-chart="relative_radar" 
+			width="650" 
+			height="400">		
+	</canvas>
+	<div data-variant-legend 
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>
+
+					</div>
+					
+					<div data-ng-if="section.componentId === 'normalisation_radar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<canvas 
+			data-normalised-indicator-chart="normalisation_radar" 
+			width="650" 
+			height="400">		
+	</canvas>
+	<div data-variant-legend 
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>
+
+					</div>
+					
+					<div data-ng-if="section.componentId === 'single_score_bar_chart'">
+						<div style="width: 650px; margin: auto;">	
+	<canvas 
+		data-single-score-bar-chart 
+		width="650" 
+		height="400">		
+	</canvas>
+	<div data-indicator-legend
+		style="padding-left: 20px; padding-right: 20px; text-align: center">
+	</div>
+</div>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+
+    <script src="libs/jquery.min.js"></script>
+    <script src="libs/angular.min.js"></script>
+	<script src="libs/angular-sanitize.min.js"></script>
+    <script src="libs/Chart.min.js"></script>
+	<script src="libs/Chart.StackedBar.js"></script>
+	
+    <script type="text/javascript">
+		
+		(function() {
+	"use strict";
+
+	var root = this;
+
+	var Colors = function() {
+
+		var predefColors = [
+			"#e53039",
+			"#296fc4",
+			"#ffc923",
+			"#52a84d",
+			"#844cad",
+			"#7fb7e5",
+			"#ff8900",
+			"#800080",
+			"#874c3f",
+			"#fcff64",
+			"#00b1f1",
+			"#70bb28",
+			"#125985",
+			"#e20073",
+			"#ffff55",
+			"#da0018",
+			"#006f9a",
+			"#ff9900"
+		];
+
+		var predefRGBs = [];
+		for (var i = 0; i < predefColors.length; i++) {
+			var col = predefColors[i];
+			var r = parseInt(col.substring(1, 3), 16);
+			var g = parseInt(col.substring(3, 5), 16);
+			var b = parseInt(col.substring(5, 7), 16);
+			predefRGBs.push({r: r, g: g, b: b});
+		}
+
+		this.getPredefinedString = function(index) {
+			if (index < predefColors.length) {
+				return predefColors[index];
+			} else {
+				return "#000000";
+			}
+		};
+
+		this.getPredefinedRgb = function(index) {
+			if (index < predefRGBs.length) {
+				return predefRGBs[index];
+			} else {
+				return {r: 0, g: 0, b: 0};
+			}
+		};
+	};
+	
+	root.Colors = new Colors();
+	
+}).call(this);
+
+
+		
+        var variantsIndex = 0;
+        var app = angular.module('ReportPage', ['ngSanitize']);
+
+        app.filter('scientific', function () {
+            return function (text) {
+                return parseFloat(text).toExponential(5);
+            };
+        });
+		
+		
+variantLegend = function() {
+	
+	return function(scope, elem, atts) {
+		var element = $(elem.get(0));
+		for(var i = 0; i < scope.report.variants.length; i++) {
+			var variant = scope.report.variants[i];
+			var color = Colors.getPredefinedString(i);
+			var text = getElementText(variant.name, color);
+			element.append(text);
+		}		
+	};
+	
+	function getElementText(variantName, color) {
+		return '<span style="padding: 10px">' +
+				'<span class="glyphicon glyphicon-stop" style="color: ' + 
+				color + '; padding: 3px"></span>' +
+				variantName + '</span>';
+	}
+	
+};
+
+		app.directive("variantLegend", variantLegend);
+
+		
+indicatorLegend = function() {
+	
+	return function(scope, elem, atts) {
+		var element = $(elem.get(0));
+		$.each(scope.getDisplayedIndicators(), function(i, indicator){
+			var color = Colors.getPredefinedString(i);
+			var text = getElementText(indicator.reportName, color);
+			element.append(text);
+		});			
+	};
+	
+	function getElementText(name, color) {
+		return '<span style="padding: 10px">' +
+				'<span class="glyphicon glyphicon-stop" style="color: ' + 
+				color + '; padding: 3px"></span>' +
+				name + '</span>';
+	}
+	
+};
+
+
+
+
+		app.directive("indicatorLegend", indicatorLegend);
+		
+		
+contributionLegend = function() {
+	
+	return function(scope, elem, atts) {
+		var element = $(elem.get(0));
+		$.each(scope.report.processes, function(i, process){
+			var color = Colors.getPredefinedString(i);
+			var text = getElementText(process.reportName, color);
+			element.append(text);
+		});
+		var otherText = getElementText("Other", "#d3d3d3");
+		element.append(otherText);
+	};
+	
+	function getElementText(name, color) {
+		return '<span style="padding: 10px">' +
+				'<span class="glyphicon glyphicon-stop" style="color: ' + 
+				color + '; padding: 3px"></span>' +
+				name + '</span>';
+	}
+	
+};
+
+
+
+		app.directive("contributionLegend", contributionLegend);
+
+	    var Controller = function($scope) {
+	
+	$scope.report = {};
+
+	$scope.getColorString = function(index) {
+		return Colors.getPredefinedString(index);
+	};
+
+	$scope.getIndicatorName = function(indicatorId) {
+		var indicators = $scope.report.indicators;
+		for (var i = 0; i < indicators.length; i++) {
+			var indicator = indicators[i];
+			if (indicator.id === indicatorId) {
+				return indicator.reportName;
+			}
+		}
+		return "";
+	};
+
+	$scope.getVariantResult = function(variant, indicator) {
+		var results = $scope.report.results;
+		for (var i = 0; i < results.length; i++) {
+			var result = results[i];
+			if (result.indicatorId !== indicator.id)
+				continue;
+			for (var j = 0; j < result.variantResults.length; j++) {
+				var variantResult = result.variantResults[j];
+				if (variantResult.variant === variant.name)
+					return variantResult.totalAmount;
+			}
+		}
+		return 0;
+	};
+
+	$scope.getSingleScore = function(variant) {
+		var score = 0;
+		for (var i = 0; i < $scope.report.indicators.length; i++) {
+			var indicator = $scope.report.indicators[i];
+			if (!indicator.displayed)
+				continue;
+			var nFactor = indicator.normalisationFactor;
+			var wFactor = indicator.weightingFactor;
+			for (var j = 0; j < $scope.report.results.length; j++) {
+				var result = $scope.report.results[j];
+				if (result.indicatorId !== indicator.id)
+					continue;
+				for (var k = 0; k < result.variantResults.length; k++) {
+					var vr = result.variantResults[k];
+					if (vr.variant !== variant.name)
+						continue;
+					score = score + (vr.totalAmount * wFactor) / nFactor;
+				}
+			}
+		}
+		return score;
+	};
+	
+	$scope.getDisplayedIndicators = function() {
+		if(!($scope.report.indicators))
+			return [];
+		var displayed = [];
+		var indicators = $scope.report.indicators;
+		for(var i = 0; i < indicators.length; i++) {
+			if(indicators[i].displayed) {
+				displayed.push(indicators[i]);
+			}				
+		}
+		return displayed;
+	};
+};
+
+
+        app.controller('Controller', Controller);
+
+		
+IndicatorBarChart = function() {
+
+	return function(scope, elem, atts) {
+
+		var chart;
+
+		scope.$watch('selectedBarChartIndicator', function() {
+			if (!scope.selectedBarChartIndicator) {
+				return;
+			}
+			if (chart) {
+				updateChart(chart, scope);
+			} else {
+				var data = getChartData(scope);
+				var canvas = elem.get(0);
+				var dist = 400 / (2 * scope.report.variants.length);
+				if (dist < 10)
+					dist = 5;
+				chart = new Chart(canvas.getContext("2d")).Bar(data, {
+					barValueSpacing: dist,
+					tooltipTemplate: "<%if (label){%><%=label%>: <%}%><%= value.toExponential(2) %>",
+					multiTooltipTemplate: "<%= value.toExponential(2) %>"
+				});
+			}
+		});
+
+		function getChartData(scope) {
+			var labels = [];
+			var data = [];
+			var indicator = scope.selectedBarChartIndicator;
+			var variants = scope.report.variants;
+			for (var i = 0; i < variants.length; i++) {
+				labels.push(variants[i].name);
+				data.push(scope.getVariantResult(variants[i], indicator));
+			}
+			return {
+				labels: labels,
+				datasets: [
+					{
+						label: indicator.reportName,
+						fillColor: "rgba(151,187,205,0.5)",
+						strokeColor: "rgba(151,187,205,0.8)",
+						highlightFill: "rgba(151,187,205,0.75)",
+						highlightStroke: "rgba(151,187,205,1)",
+						data: data
+					}
+				]
+			};
+		}
+
+		function updateChart(chart, scope) {
+			var indicator = scope.selectedBarChartIndicator;
+			var variants = scope.report.variants;
+			for (var i = 0; i < variants.length; i++) {
+				var val = scope.getVariantResult(variants[i], indicator);
+				chart.datasets[0].bars[i].value = val;
+			}
+			chart.update();
+		}
+	};
+};
+
+
+		app.directive("indicatorBarChart", IndicatorBarChart);
+		
+		
+// Creates a radar or bar chart with all indicator results for each variant
+// relative to each other or normalised to the normalisation values of the
+// respective indicators. The chart type is passed as value of the directive
+// attribute. The following values are supported:
+// relative_bar, normalisation_bar, relative_radar, normalisation_radar
+NormalisedIndicatorChart = function() {
+
+	return function(scope, elem, atts) {
+		var canvas = elem.get(0);
+		var report = scope.report;
+		var type = atts["normalisedIndicatorChart"];
+		if (!type) {
+			console.log("no chart type given in normalisedIndicatorChart directive");
+			return;
+		}
+		var data = calculateDatasets(report, type);
+		if (type === 'relative_radar' || type === 'normalisation_radar') {
+			new Chart(canvas.getContext("2d")).Radar(data, {
+				tooltipTemplate: "<%if (label){%><%=label%>: <%}%><%= value.toExponential(2) %>",
+				multiTooltipTemplate: "<%= value.toExponential(2) %>"
+			});
+		} else if (type === 'relative_bar' || type === 'normalisation_bar') {
+			var dist = 400 / (2 * report.variants.length * scope.getDisplayedIndicators().length);
+			if (dist < 5)
+				dist = 5;
+			new Chart(canvas.getContext("2d")).Bar(data, {
+				barValueSpacing: dist,
+				tooltipTemplate: "<%if (label){%><%=label%>: <%}%><%= value.toExponential(2) %>",
+				multiTooltipTemplate: "<%= value.toExponential(2) %>"
+			});
+		}
+	};
+
+	function calculateDatasets(report, type) {
+		var dataSets = [];
+		var index = getResultIndex(report);
+		for (var i = 0; i < report.variants.length; i++) {
+			var variant = report.variants[i];
+			var data = [];
+			for (var j = 0; j < report.indicators.length; j++) {
+				var indicator = report.indicators[j];
+				if (!indicator.displayed) {
+					continue;
+				}
+				var indexEntry = index[indicator.id];
+				var val = indexEntry.variantResults[variant.name];
+				if (type === 'normalisation_radar' || type === 'normalisation_bar') {
+					var factor = indicator.normalisationFactor;
+					if(!factor) {
+						data.push(0);
+					} else {
+						data.push(val / factor);
+					}
+				} else {
+					var max = indexEntry.max;
+					if(!max) {
+						data.push(0);
+					} else {
+						data.push(100 * val / max);
+					}
+				}
+			}
+			var rgb = Colors.getPredefinedRgb(i);
+			var colorPref = "rgba(" + rgb.r + "," + rgb.g + "," + rgb.b + ",";
+			dataSets.push(createDataSet(variant, colorPref, data, type));
+		}
+		return {
+			labels: getIndicatorLabels(report),
+			datasets: dataSets};
+	}
+
+	function createDataSet(variant, colorPref, data, type) {
+		if (type === 'relative_radar' || type === 'normalisation_radar') {
+			return {
+				label: variant.name,
+				fillColor: colorPref + "0.2)",
+				strokeColor: colorPref + ",1)",
+				pointColor: colorPref + "1)",
+				pointStrokeColor: "#fff",
+				pointHighlightFill: "#fff",
+				pointHighlightStroke: colorPref + "1)",
+				data: data
+			};
+		} else {
+			return {
+				label: variant.name,
+				fillColor: colorPref + "0.5)",
+				strokeColor: colorPref + "0.8)",
+				highlightFill: colorPref + "0.75)",
+				highlightStroke: colorPref + "1)",
+				data: data
+			};
+		}
+	}
+
+	function getIndicatorLabels(report) {
+		var labels = [];
+		for (var i = 0; i < report.indicators.length; i++) {
+			var indicator = report.indicators[i];
+			if (!indicator.displayed) {
+				continue;
+			}
+			labels.push(indicator.reportName);
+		}
+		return labels;
+	}
+
+	// returns an object with the maximum and variant results for each indicator
+	function getResultIndex(report) {
+		var index = {};
+		for (var i = 0; i < report.results.length; i++) {
+			var result = report.results[i];
+			var max = null;
+			var varResults = {};
+			for (var j = 0; j < result.variantResults.length; j++) {
+				var varResult = result.variantResults[j];
+				var total = varResult.totalAmount;
+				varResults[varResult.variant] = total;
+				if (!max) {
+					max = Math.abs(total);
+				} else {
+					max = Math.max(max, Math.abs(total));
+				}
+			}
+			var indexEntry = {
+				max: max,
+				variantResults: varResults
+			};
+			index[result.indicatorId] = indexEntry;
+		}
+		return index;
+	}
+
+};
+		app.directive("normalisedIndicatorChart", NormalisedIndicatorChart);
+		
+		
+SingleScoreBarChart = function() {
+
+	return function(scope, elem, atts) {
+		var canvas = elem.get(0);
+		var report = scope.report;
+		var dist = 400 / (2 * report.variants.length);
+		if (dist < 5)
+			dist = 5;
+		var data = createChartData(scope);
+		new Chart(canvas.getContext("2d")).StackedBar(data, {
+			barDatasetSpacing: dist, 
+			barValueSpacing: dist,
+			tooltipTemplate: "<%if (label){%><%=label%>: <%}%><%= value.toExponential(2) %>",
+			multiTooltipTemplate: "<%= value.toExponential(2) %>"
+		});
+	};
+
+	function createChartData(scope) {
+		var report = scope.report;
+		var dataSets = createDataSets(scope);
+		var variantNames = [];
+		$.each(report.variants, function(i, variant) {
+			variantNames.push(variant.name);
+			$.each(scope.getDisplayedIndicators(), function(j, indicator) {
+				var result = scope.getVariantResult(variant, indicator);
+				var nFactor = indicator.normalisationFactor;
+				var wFactor = indicator.weightingFactor;
+				var score = result * wFactor / nFactor;
+				dataSets[j].data.push(score);
+			});
+		});
+		return {
+			labels: variantNames,
+			datasets: dataSets
+		};
+	}
+
+	// initializes an empty data set (series) for every indicator
+	function createDataSets(scope) {
+		var dataSets = [];
+		$.each(scope.getDisplayedIndicators(), function(i, indicator) {
+			var color = Colors.getPredefinedRgb(i);
+			var pref = "rgba(" + color.r + "," + color.g + "," + color.b + ",";
+			var dataSet = {
+				label:indicator.name,
+				fillColor: pref + "0.5)",
+				strokeColor: pref + "0.8)",
+				highlightFill: pref + "0.75)",
+				highlightStroke: pref + "1)",
+				data: []
+			};
+			dataSets.push(dataSet);
+		});
+		return dataSets;
+	}
+
+};
+
+		app.directive("singleScoreBarChart", SingleScoreBarChart);
+				
+		
+ContributionChart = function() {
+
+	return function(scope, elem, atts) {
+
+		var chart;
+
+		scope.$watch('selectedContributionIndicator', function() {
+			if (!scope.selectedContributionIndicator) {
+				return;
+			}
+			if (chart) {
+				updateChart(chart, scope);
+			} else {
+				var data = createChartData(scope);
+				var canvas = elem.get(0);
+				var dist = 400 / (2 * scope.report.variants.length);
+				if (dist < 5)
+					dist = 5;
+				chart = new Chart(canvas.getContext("2d")).StackedBar(data, {
+					barDatasetSpacing: dist, 
+					barValueSpacing: dist,
+					tooltipTemplate: "<%if (label){%><%=label%>: <%}%><%= value.toExponential(2) %>",
+					multiTooltipTemplate: "<%= value.toExponential(2) %>"
+				});
+			}
+
+		});
+	};
+
+	function createChartData(scope) {
+		var labels = [];
+		var dataSets = initDataSets(scope.report.processes);
+		var indicator = scope.selectedContributionIndicator;
+		$.each(scope.report.variants, function(i, variant) {
+			labels.push(variant.name);
+			var contributions = getContributions(scope, indicator, variant);
+			$.each(contributions, function(i, contribution) {
+				var idx = getIndex(contribution, scope.report.processes);
+				if (idx < 0)
+					return;
+				dataSets[idx].data.push(contribution.amount);
+			});
+		});
+		return {
+			labels: labels,
+			datasets: dataSets
+		};
+	}
+	
+	function updateChart(chart, scope) {
+		var indicator = scope.selectedContributionIndicator;
+		$.each(scope.report.variants, function(i, variant) {			
+			var contributions = getContributions(scope, indicator, variant);
+			$.each(contributions, function(j, contribution) {
+				var idx = getIndex(contribution, scope.report.processes);
+				if (idx < 0)
+					return;				
+				chart.datasets[idx].bars[i].value = contribution.amount;
+			});
+		});
+		chart.update();
+	}
+
+	function getContributions(scope, indicator, variant) {
+		for (var i = 0; i < scope.report.results.length; i++) {
+			var result = scope.report.results[i];
+			if (result.indicatorId !== indicator.id) {
+				continue;
+			}
+			for (var j = 0; j < result.variantResults.length; j++) {
+				var varResult = result.variantResults[j];
+				if (varResult.variant === variant.name) {
+					return varResult.contributions;
+				}
+			}
+		}
+		return [];
+	}
+
+	function initDataSets(processes) {
+		var dataSets = [];
+		$.each(processes, function(i, process) {
+			var color = Colors.getPredefinedRgb(i);
+			var pref = "rgba(" + color.r + "," + color.g + "," + color.b + ",";
+			var datSet = {
+				label: process.reportName,
+				fillColor: pref + "0.5)",
+				strokeColor: pref + "0.8)",
+				highlightFill: pref + "0.75)",
+				highlightStroke: pref + "1)",
+				data: []
+			};
+			dataSets.push(datSet);
+		});
+		dataSets.push({
+			label: "Other",
+			fillColor: "rgba(211,211,211,0.5)",
+			strokeColor: "rgba(211,211,211,0.8)",
+			highlightFill: "rgba(211,211,211,0.75)",
+			highlightStroke: "rgba(211,211,211,1)",
+			data: []
+		});
+		return dataSets;
+	}
+
+	function getIndex(contribution, processes) {
+		if (contribution.rest)
+			return processes.length;
+		for (var i = 0; i < processes.length; i++) {
+			if (contribution.processId === processes[i].id) {
+				return i;
+			}
+		}
+		return -1;
+	}
+};
+
+		app.directive("contributionChart", ContributionChart);
+		
+		function setData(report, messages) {
+			var Initializer = function(report, messages) {
+
+	var element = document.getElementById("contentDiv");
+	var scope = angular.element(element).scope();
+	sortLists(report);
+	scope.$apply(function() {
+		scope.report = report;
+		scope.Messages = messages;
+		var initialIndicator = getFirstDisplayedIndicator(report);
+		scope.selectedContributionIndicator = initialIndicator;
+		scope.selectedBarChartIndicator = initialIndicator;
+	});
+
+	function sortLists(report) {
+		report.variants.sort(function(v1, v2) {
+			if (!v1.name || !v2.name)
+				return 0;
+			return v1.name.localeCompare(v2.name);
+		});
+		report.indicators.sort(function(i1, i2) {
+			if (!i1.reportName || !i2.reportName)
+				return 0;
+			return i1.reportName.localeCompare(i2.reportName);
+		});
+		report.processes.sort(function(p1, p2) {
+			if(!p1.reportName || !p2.reportName)
+				return 0;
+			return p1.reportName.localeCompare(p2.reportName);
+		});
+	}
+
+	function getFirstDisplayedIndicator(report) {
+		if (!report.indicators) {
+			return null;
+		}
+		for (var i = 0; i < report.indicators.length; i++) {
+			var indicator = report.indicators[i];
+			if (indicator.displayed) {
+				return indicator;
+			}
+		}
+		return null;
+	}
+
+};
+
+
+			Initializer(report, messages);
+        }
+
+		//do not remove or modify the comment below, it is used as template for static report exports.
+		$(window).load( function() { setData({"title":"Results of project: Glass Wool vs. Hemp Insulation","withNormalisation":true,"withWeighting":false,"sections":[{"index":0,"title":"Introduction","text":"The following report depicts the main results of the comparison of 1 m2 of insulation with the same thermal resistance made from glass wool and hemp fibers. It must be stressed that the report cannot be seen as complete analysis due to the fact that the data and information the research group have had access to have been limited. Main data is gathered from already conducted LCAs and data sheets from producers of Glass wool insualtion  (ISOVER A/S) and Hemp Insulation (THERMO NATUR GmbH \u0026 Co. KG)\n\nThe functional unit that has been investigted is insulation of 1 m2 with the two products in amounts that gives the same thermal resistance of 2,7 m2 K/W. This corresponds to 1,5kg of Glass Wool insulation and 4 kg om Thermo Hemp.\n\nThe results of these results corresponds to an Cradle to Gate of Use LCA, including resource extractions/production of agricultural raw materials, transport to factory, energy and materials added in the production phase and transport from factory to assumed application of the finished product.\n\nFor detailed description of assumptions, see main report.\n\n"},{"index":1,"title":"Project Variants","text":"The two product variants","componentId":"variant_description_table"},{"index":2,"title":"Selected LCIA Categories","text":"","componentId":"indicator_description_table"},{"index":3,"title":"LCIA Results of selected LCIA categories","text":"","componentId":"impact_result_table"},{"index":4,"title":"Impact Category: Global Warming Potential GWP","text":"This chart depicts the result of the GWP calculations in terms of CO2-eq pr. functional unit. The chart shows that the amount of CO2 released by the hemp is much higher than that of Glass Wool. This is probably due to the fact that the amount of hemp needed in order to reach the same thermal resistance is 2,667 times bigger.","componentId":"indicator_bar_chart"},{"index":5,"title":"Impact Category: Acidification Potential","text":"The chart depicts the acidification potential in terms of SO2-eq per funtional unit. Acidification is higher for Hemp Insulation by approximately a factor of 3. ","componentId":"indicator_bar_chart"},{"index":6,"title":"Impact Category: Human Toxicity","text":"Potential harmful subsatnces derived from production of insulation in order to realize the functional unit. It is measured in kg of 1,4-dichlorobenzene eq.","componentId":"indicator_bar_chart"},{"index":7,"title":"LCIA Bar Chart of selected impact categories","text":"Selected impact categories side by side. The highest score is set to 100% and other variants is shown in relation to this.","componentId":"relative_indicator_bar_chart"},{"index":8,"title":"Conclusion","text":"This result report have depicted how Insulation made from Glass Wool and Hemp relates to eachother in selected Impact Categories in order to realize the Functional Unit of wall insulation with thermal resistance of 2,7 m2 K/W. In general Insulation made from Hemp seems as the worst of the two when it comes to environmental topics. However it needs to be stressed that the reason for this is the amount of product that needs to be produced in order to realize the Functional Unit is higher for the Hemp insulation. This means that the picture might look completely different if a comparison of the two products is done kilo for kilo and not related to the Functional Unit. This however lies outside the scope of this study."}],"parameters":[],"variants":[{"id":0,"name":"Glass Wool","description":"1,5 kg"},{"id":1,"name":"Hemp Insulation","description":"4 kg"}],"results":[{"indicatorId":10,"variantResults":[{"variant":"Hemp Insulation","totalAmount":0.015304379917360002,"contributions":[{"processId":-1,"amount":0.015304379917360004,"rest":true}]},{"variant":"Glass Wool","totalAmount":0.004464307721141999,"contributions":[{"processId":-1,"amount":0.004464307721142,"rest":true}]}]},{"indicatorId":1,"variantResults":[{"variant":"Hemp Insulation","totalAmount":0.02720354718843631,"contributions":[{"processId":-1,"amount":0.027203547188436313,"rest":true}]},{"variant":"Glass Wool","totalAmount":0.024332343421518594,"contributions":[{"processId":-1,"amount":0.024332343421518594,"rest":true}]}]},{"indicatorId":3,"variantResults":[{"variant":"Hemp Insulation","totalAmount":2.9668982456097037,"contributions":[{"processId":-1,"amount":2.9668982456097037,"rest":true}]},{"variant":"Glass Wool","totalAmount":0.8340990886959327,"contributions":[{"processId":-1,"amount":0.8340990886959327,"rest":true}]}]}],"indicators":[{"id":10,"descriptor":{"referenceUnit":"kg SO2 eq.","refId":"721619b4-95cf-447e-9dd4-38df96f90476","id":1867816,"name":"Acidification potential - average Europe","description":"AP ( Huijbregts, 1999; average Europe total, A\u0026B)","type":"IMPACT_CATEGORY"},"reportName":"Acidification potential - average Europe","displayed":true,"normalisationFactor":2.8130986161E10},{"id":3,"descriptor":{"referenceUnit":"kg CO2 eq.","refId":"0e0bcbdc-d4cd-46c0-811c-6dc20df54629","id":1867217,"name":"Climate change - GWP100","description":"GWP100 (IPCC, 2007)","type":"IMPACT_CATEGORY"},"reportName":"Climate change - GWP100","displayed":true,"normalisationFactor":5.0218836986E12},{"id":9,"descriptor":{"referenceUnit":"kg antimony eq.","refId":"3a08605b-d7c9-4f40-a17e-74cece1dde8b","id":1867535,"name":"Depletion of abiotic resources - elements, ultimate reserves","description":"ADPelements (Oers et al. 2001)","type":"IMPACT_CATEGORY"},"reportName":"Depletion of abiotic resources - elements, ultimate reserves","displayed":false,"normalisationFactor":8.4641204022E7},{"id":6,"descriptor":{"referenceUnit":"MJ","refId":"1080477d-1784-43c7-9a6e-b158e4a4f09b","id":1867532,"name":"Depletion of abiotic resources - fossil fuels","description":"ADPfossil fuels (Oers et al., 2001)","type":"IMPACT_CATEGORY"},"reportName":"Depletion of abiotic resources - fossil fuels","displayed":false,"normalisationFactor":3.1489842757E13},{"id":5,"descriptor":{"referenceUnit":"kg PO4--- eq.","refId":"aaa5ff8b-a60c-47ad-a74b-9d8172ee3f88","id":1867842,"name":"Eutrophication - generic","description":"EP (Heijungs et al. 1992))","type":"IMPACT_CATEGORY"},"reportName":"Eutrophication - generic","displayed":false,"normalisationFactor":1.3186114794E10},{"id":7,"descriptor":{"referenceUnit":"kg 1,4-dichlorobenzene eq.","refId":"f1f73325-64c9-4668-b0c3-9babe50bb4b5","id":1873743,"name":"Freshwater aquatic ecotoxicity - FAETP inf","description":"FAETP inf. (Huijbregts, 1999 \u0026 2000)","type":"IMPACT_CATEGORY"},"reportName":"Freshwater aquatic ecotoxicity - FAETP inf","displayed":false,"normalisationFactor":5.1907319227E11},{"id":1,"descriptor":{"referenceUnit":"kg 1,4-dichlorobenzene eq.","refId":"cc4e80c6-afe6-43e3-a5b6-23962e8d99fa","id":1871867,"name":"Human toxicity - HTP inf","description":"HTP inf. (Huijbregts, 1999 \u0026 2000)","type":"IMPACT_CATEGORY"},"reportName":"Human toxicity - HTP inf","displayed":true,"normalisationFactor":7.7816608342E12},{"id":0,"descriptor":{"referenceUnit":"kg 1,4-dichlorobenzene eq.","refId":"c3829256-f575-49d4-8a48-4794e8210366","id":1867991,"name":"Marine aquatic ecotoxicity - MAETP inf","description":"MAETP inf. (Huijbregts, 1999 \u0026 2000)","type":"IMPACT_CATEGORY"},"reportName":"Marine aquatic ecotoxicity - MAETP inf","displayed":false,"normalisationFactor":1.1672661986E14},{"id":8,"descriptor":{"referenceUnit":"kg CFC-11 eq.","refId":"6c4c343b-1140-43e4-ad21-fd3514ca5328","id":1867700,"name":"Ozone layer depletion - ODP steady state","description":"ODP steady state (WMO, 2003)","type":"IMPACT_CATEGORY"},"reportName":"Ozone layer depletion - ODP steady state","displayed":false,"normalisationFactor":8.9415770777E7},{"id":4,"descriptor":{"referenceUnit":"kg ethylene eq.","refId":"f65587bb-c11d-4ad5-9864-22025b28a5e0","id":1875681,"name":"Photochemical oxidation - high Nox","description":"POCP (Jenkin \u0026 Hayman, 1999; Derwent et al. 1998; high NOx)","type":"IMPACT_CATEGORY"},"reportName":"Photochemical oxidation - high Nox","displayed":false,"normalisationFactor":8.4755284868E9},{"id":2,"descriptor":{"referenceUnit":"kg 1,4-dichlorobenzene eq.","refId":"ca0fb42d-5fb1-45c5-a578-2f7d396d8674","id":1869929,"name":"Terrestrial ecotoxicity - TETP inf","description":"TETP inf.(Huijbregts, 1999 \u0026 2000)","type":"IMPACT_CATEGORY"},"reportName":"Terrestrial ecotoxicity - TETP inf","displayed":false,"normalisationFactor":4.8622828623E10}],"processes":[]}, {"Delete":"Delete","CheckForUpdates":"Check for updates","UnitAlreadyExistsInUnitGroup":"Unit already exists in unit group {0}","DatabaseImportDescription":"Imports data from an existing database into the active database","Product":"Product","DataCollectionPeriod":"Data collection period","NumberOfDecimalPlaces":"Number of decimal places","ReportSections":"Report sections","NewActor":"New actor","Physical":"Physical","ReportName":"Report name","Reload":"Reload","ILCD_RunImport":"Run Import","LCIAMethod":"LCIA Method","ResultContributions":"Result contributions","ExportResults":"Export results","ExportDatabase":"Export database","Parameters":"Parameters","CreatesANewProject":"Creates a new project","SingleScoreBarChart":"Single score bar chart","DataSourceInformation":"Data source information","ImpactCategory":"Impact category","CreateProcesslink":"create processlink","RemoveConnections":"Remove connections","EcoSpoldConfiguration":"EcoSpold Configuration","Analysis":"Analysis","Note":"Note","ExportEcoSpold":"Export EcoSpold","LastModificationDate":"Last modification date","Author":"Author","ImpactFactors":"Impact factors","InventoryResults":"Inventory results","GlobalParameters":"Global parameters","OverwriteFileQuestion":"The selected file already exists. Do you want to overwrite it?","FixedCosts":"Fixed costs","ReferenceUnit":"Reference unit","DeveloperTools":"Developer tools","Website":"Website","Notification":"Notification","DatabaseVersionCheckFailed":"Could not get the version from the database. Is this an openLCA database?","Output":"Output","CutOffForFirstLayerIn":"Cut off for first layer (in %)","MatrixExport":"Matrix Export","DataDocumentor":"Data documentor","ProducedBy":"Produced by","DirectContribution":"Direct contribution","ExportDirectory":"Export directory","RemoveSupplyChain":"Remove supply chain","Minimize":"minimize","UniformDistribution":"Uniform distribution","EndDate":"End date","Statistics":"Statistics","AvoidedProduct":"Avoided product","NewProductSystem":"New product system","Semicolon":"Semicolon","AccessAndUseRestrictions":"Access and use restrictions","SearchingForUnits":"Searching for units...","Economic":"Economic","Year":"Year","Layout":"Layout","Searching":"Searching...","LastChange":"Last change","ImportData":"Import data","Parameter":"Parameter","ReferenceFlowProperty":"Reference flow property","ConnectProviders":"Connect providers","NoDatabaseOpened":"No database is opened","Add":"Add","Email":"e-mail","ModelingAndValidation":"Modeling and validation","InvalidMemoryValue":"Invalid memory value","Start":"Start","DatabaseWasExportedToFile":"Database was exported to file","ConnectWithSystemProcessesIfPossible":"Connect with system processes if possible","Port":"Port","ConnectRecipients":"Connect recipients","SingleScore":"Single score","UnitsAndFlowProperties":"Units and flow properties","InputsOutputs":"Inputs/Outputs","Global":"Global","SaveAsDefault":"Save as default","SingleAmount":"Single amount","Test":"Test","Version":"Version","GeneralInformation":"General information","AddConnectedProcesses":"Add connected processes","NormalisationRadarChart":"Normalisation - radar chart","SaveChangesQuestion":"Do you want to save the changes?","CreateANewDatabase":"Create a new database","CalculationProperties":"Calculation properties","TextReference":"Text reference","DeleteProcesslink":"delete processlink","DatabaseName":"Database name","OpenInEditor":"Open in editor","FromDirectory":"From directory:","NoProjectVaraintsAreDefined":"No project variants are defined","DatabaseContent":"Database content","FlowProperties":"Flow properties","ProjectResults":"Project results","EmptyValueMessage":"The given value is empty.","SourceFileOverwriteFileQuestion":"A file with the given name already exists in this database. Do you want to overwrite it?","UpdateDatabaseQuestion":"The selected database needs an update. Do you want to run it?","LciaCategoryDescriptionTable":"LCIA category description table","Prefer":"Prefer: {0}","Projects":"Projects","SourceFileDeleteQuestion":"Do you really want to delete this file?","LogNormalDistribution":"Logarithmic normal distribution","VariantDescriptionTable":"Variant description table","ChooseDirectory":"Choose directory...","Language":"Language","ILCD_SearchFailedMessage":"Network search failed: ","InvalidNumber":"Invalid number","NameEmptyOrAlreadyExists":"The name is empty or already exists","Component":"Component","Home":"Home","Inputs":"Inputs","WeightingFactor":"Weighting factor","Report":"Report","CannotDeleteRefFlow":"Cannot delete reference flow","ParameterValueTable":"Parameter value table","Flows":"Flows","UnitMappingPage_Description":"Please select the flow property to which a unit should belong for the import process, and assign a conversion factor if unit is new.","ProductSystems":"Product systems","TotalAmount":"Total amount","NoDistribution":"No distribution","ImportEcoSpold02DataSets":"Import EcoSpold 02 data sets","Cutoff":"Cut-off","DeleteDatabase":"Delete database","AnalysisResultOf":"Analysis result of","CannotDeleteMessage":"The selected element cannot be deleted because it is used in other data sets. See the usage view to see where it is used.","DefaultMethod":"Default method","PleaseSpecifyPortNumber":"Please specify a port number","CreatesANewActor":"Creates a new actor","ExpandAll":"Expand all","TimeAndAuthor":"Time and author","Import":"Import...","Address":"Address","DatabaseType":"Database type","CompleteReferenceData":"Complete reference data","WithPassword":"With password","InterventionMatrix":"Intervention matrix","DBImportNoTargetConnectionFailedMessage":"Could not get the version from the source database.","Remove":"Remove","Processes":"Processes","UsageOf":"Usage of","UsedInProcesses":"Used in processes","FilterByName":"Filter by name","Telefax":"Telefax","UpdateMinorVersion":"Update minor version","Example":"Example","SearchRecipientsFor":"Search recipients for","InvalidParameterName":"Invalid parameter name","SelectLanguageNoteMessage":"Changes will not take affect until openLCA is restarted","Settings":"Settings","Doi":"Doi","InputParameters":"Input parameters","BaseUncertainty":"Base uncertainty","FileImportPage_Description":"Please select the files to import into openLCA","ExcelExport":"Excel Export","Dot":"Dot","ProcessContributionChart":"Process contribution chart","Publication":"Publication","Sources":"Sources","RelativeLciaResultsRadarChart":"Relative LCIA results - radar chart","CausalAllocation":"Causal allocation","ImpactAssessmentResults":"Impact assessment results","Variant":"Variant","ModelGraph":"Model graph","TriangleDistribution":"Triangle distribution","CreatesANewProductSystem":"Creates a new product system","CreatesANewSource":"Creates a new source","DataSetOtherEvaluation":"Data set other evaluation","DataSetOwner":"Data set owner","Map":"Map","MemoryToLowMessage":"The memory value must be at least 256 MB.","Hide":"Hide","Minimum":"Minimum","Warning":"Warning","ImportDatabase":"Import database","ShowFormulas":"Show formulas","Cancel":"Cancel","Complete":"Complete","AlreadyPresent":"Already present","PleaseEnterTheNameOfTheNewCategory":"Please enter the name of the new category:","Folder":"Folder","Direction":"Direction","URL":"URL","Comma":"Comma","ProcessType":"Process type","SimaProCSVImport":"SimaPro CSV Import","ReportParameters":"Report parameters","TestDistribution":"Test distribution","DBImportVersionNewerMessage":"The version of the source database is newer than this version of openLCA.","Normalization":"Normalization","StandardDeviation":"Standard deviation","DataSelection":"Data selection","SamplingProcedure":"Sampling procedure","NewFlowProperty":"New flow property","Usage":"Usage","NumberFormatPage_Description":"Set the number of decimal places for the display of numbers.","Resize":"resize","Amount":"Amount","AllocationMethod":"Allocation method","InvalidValue":"Invalid value","Text":"Text","NewCostEntry":"New cost entry","SelectProviders":"Select providers","Flow":"Flow","DirectImpact":"Direct impact","ErrorPopupMessage":"See the log-file for further information","Weighting":"Weighting","LocalDatabase":"Local database","ReconnectProcesslink":"reconnect processlink","FlowType":"Flow type","QuickResults":"Quick results","NormalisationResultTable":"Normalisation result table","CalculateDefaultValues":"Calculate default values","UnitGroups":"Unit groups","ExportingProcesses":"Exporting processes","NewImpactMethod":"New impact assessment method","TextDropComponent_ToolTipText":"Drag a selected object from \nthe navigation view into the \ntext field or click to open a \ndialog.","Unit":"Unit","CostCategory":"Cost category","CreateANewProductFlowForTheProcess":"Create a new product flow for the process","NoUnitGroupSelected":"No unit group selected","Result":"Result","Copyright":"Copyright","UpstreamTotal":"Upstream total","NameCannotBeEmpty":"The name cannot be empty","AddNewChildCategory":"Add new child category","Factor":"Factor","CreateProductSystem":"Create product system","NoReferenceFlowPropertySelected":"No reference flow property selected","ILCD_NetworkImport":"Network Import","Reset":"Reset","SaveAs":"Save as...","AvoidedProductFlow":"Avoided product flow","ConversionFactor":"Conversion factor","TexchnologyMatrix":"Technology matrix","GeometricMean":"Geometric mean","Calculate":"Calculate","ImageExport":"Image export","Actors":"Actors","MoveDown":"Move down","City":"City","DeleteParameter":"Delete paramater","Browse":"Browse","BrowserConfiguration":"Browser configuration","ImportEcoSpold01DataSets":"Import EcoSpold 01 data sets","ContributionTree":"Contribution tree","NoAnalysisOptionsSet":"No analysis options set","Value":"Value","Save":"Save","ILCD_SearchPageDescription":"Search and select processes for the import","DefaultFlowProperty":"Default flow property","File":"\u0026File","AssignUnits":"Assign units","Telephone":"Telephone","MinimizeAll":"Minimize all","CalculateCosts":"Calculate costs","ProductSystem":"Product system","Remote":"Remote","NoDescription":"No description","Information":"Information","NewLCIAMethod":"New LCIA method","RegionalizedLCIA":"Regionalized LCIA","ExportAsMatrix":"Export as matrix","Allocation":"Allocation","FlowPropertyType":"Flow property type","DatabaseRenameError":"The given name is not a valid or a database with this name already exists.","ILCD_NO_READ_OR_WRITE_ACCESS_MSG":"You do not have read or write access","ExportILCD":"Export ILCD","OK":"OK","InfrastructureProcess":"Infrastructure process","IntendedApplication":"Intended application","BuildNextTier":"Build next tier","ModelingConstants":"Modeling constants","Collapse":"collapse","AdministrativeInformation":"Administrative information","No":"No","NotAnIntegerNumber":"The given value is not an integer number.","AlreadyConnected":"Already connected","Mode":"Mode","SelectTheExportFile":"Select the export file","ConfigureEcospoldMessage":"On this page you can configure the exported EcoSpold format","Error":"Error","CategoryNotEmpty":"The category is not empty.","Host":"Host","UpdatingProductSystem":"Updating product system","MinimalTree":"minimal tree","EmptyDatabase":"Empty database","PleaseSpecifyHost":"Please specify a host","English":"English","Variants":"Variants","SelectObjectPage_Description":"Please specify an output directory and select the {0} you want to export","ImportEcoSpold":"Import EcoSpold","SingleScoreTable":"Single score table","CreateNew":"Create new","SavingDiagramAsImageIn":"Saving diagram as image in {0}","FlowContributions":"Flow contributions","CreatingEcoSpoldFolder":"Creating ecoSpold folder","MaximumMemoryUsage":"Maximum memory usage in MB","NewImpactCategory":"New impact category","Configuration":"Configuration","DatabaseNeedsUpdate":"The given database is newer than this openLCA version.","ExportReport":"Export report","ProcessResults":"Process results","Edit":"Edit","ILCD_CONNECTION_FAILED_MSG":"Connection failed. Please check your network connection, URL, and user data.","Waste":"Waste","NewSource":"New source","AvoidedWasteFlow":"Avoided waste flow","Daily":"Daily","NewDatabase_InvalidName":"The name is not a valid identifier (characters, numbers, and underscores are allowed)","Unknown":"Unknown","DeleteReportSectionQuestion":"Do you really want to delete this report section?","Never":"Never","Actor":"Actor","ProjectSetup":"Project setup","RemoveObject":"Remove object","FlowProperty":"Flow property","NormalizationAndWeightingSet":"Normalization and weighting set","DeleteFile":"Delete file","LCIMethod":"LCI method","Cut":"Cut","CouldNotOverwriteFile":"Could not overwrite file","ElementaryFlow":"Elementary flow","ClickHereToChangeDisplay":"Click here to change the display","CreatesANewUnitGroup":"Creates a new unit group","Sum":"Sum","Code":"Code","Longitude":"Longitude","ImpactContributions":"Impact contributions","Project":"Project","MatrixFiles":"Matrix files","CalculationWizardDescription":"Please select the properties for the calculation","ExportDone":"Export done","PhysicalAndEconomicAllocation":"Physical \u0026 economic allocation","NewDatabase_AlreadyExists":"A database with this name already exists","Expand":"expand","ExportProcess":"Export process ...","FileAlreadyExists":"File already exists","Outputs":"Outputs","ProcessCosts":"Process costs","EcoSpold2Export":"EcoSpold 2 Export","AsDefinedInProcesses":"As defined in processes","DeleteSection":"Delete section","DependentParameters":"Dependent parameters","Group":"Group","IsInvalidFormula":"is an invalid formula","KmlEditor":"KML Editor","Unmark":"Unmark","UserFriendlyName":"User friendly name","Open":"Open","Showviews":"Show \u0026views","Groups":"Groups","NormalizationWeighting":"Normalization and weighting","CalculateResults":"Calculate results","Maximize":"maximize","Context":"Context","Window":"\u0026Window","Progress":"Progress","SelectADirectory":"Select a directory","DeleteDatabaseParameterQuestion":"Do you really want to delete the selected parameter from the database?","ProcessContributions":"Process contributions","Connection":"Connection","Reviewer":"Reviewer","Section":"Section","MemoryToHighMessage":"The memory value is to high for your operating system.","CalculationType":"Calculation type","NormalDistribution":"Normal distribution","UnitProcess":"Unit process","Select":"Select {0}","SelectImportFiles":"Select import files","CSVFormat":"CSV Format","ErrorPopupTitle":"An unexpected error occured","Display":"Display","Other":"Other","Latitude":"Latitude","NoQuantitativeReferenceSelected":"No quantitative reference selected","Process":"Process","OpenLCAUpdateCheck":"openLCA update check","SearchResults":"Search results","ConnectionFailed":"Connection failed","Name":"Name","ReferenceUnitIsEmptyOrInvalid":"Reference unit is empty or invalid","PedigreeMatrix":"Pedigree matrix","Weekly":"Weekly","ConsumedBy":"Consumed by","ReferenceProcess":"Reference process","Search":"Search","DoYouReallyWantToDelete":"Do you really want to delete {0}","Route":"Route","ExportResultsToExcel":"Export results to Excel","CreateProcess":"create process","CreatesANewFlow":"Creates a new flow","NoReferenceProcessSelected":"No reference process selected","SystemSaveProceedQuestion":"In order to perform the requested task the product system must be saved. Do you want to proceed?","DatabaseImport":"Database import","UseBrowserFeatures":"Use browser features","NewProject":"New project","ILCD_AUTHENTICATION_FAILED_MSG":"Authentication failed. Please check your user name and password.","OnlineHelp":"Online help","ResultsOf":"Results of","ColumnSeparator":"Column separator","OpenEditor":"Open editor","SettingsForTheSankeyDiagram":"Settings for the Sankey diagram","OpenDatabase":"Open database","CouldNotOpenDatabase":"Could not open database","UnitGroup":"Unit group","ProcessExcelImportDescription":"Import processes from MS Excel","Yes":"Yes","BuildSupplyChain":"Build supply chain","Mark":"Mark","AnalyzingForProblems":"Analyzing for problems","Time":"Time","Properties":"Properties","VersionNewer":"Version newer","UncertaintyDistribution":"Uncertainty distribution","DeleteProcess":"delete process","IndicatorScore":"Indicator score","NumberOfSimulations":"Number of simulations","CreatesANewFlowProperty":"Creates a new flow property","DBImportNoTarget":"You need to open a target database of the import.","LCIAResult":"LCIA Results","AddSection":"Add section","Password":"Password","ProductSystemStatistics":"Product system statistics","NormalisationBarChart":"Normalisation - bar chart","OverwriteFile":"Overwrite file","DeleteCategoryQuestion":"Do you really want to delete the selected category?","SelectTheParameterYouWantToReferTo":"Select the parameter you want to refer to","IsNotValidNumber":"is not a valid number","Paste":"Paste","ToDirectory":"To directory:","ZipCode":"Zip code","CreatesANewImpactMethod":"Creates a new impact method","Title":"Title","Rename":"Rename","NewSection":"New section","Filter":"Filter","ParameterDescriptionTable":"Parameter description table","SaveChanges":"Save changes","ShowOutline":"Show outline","IsNotValidParameterName":"is not a valid parameter name","CollapseAll":"Collapse all","ProductSystemExcelExportMessage":"Please select a directory to export the product system to. \nA new one, where all created files are placed, will be created under the selected directory.","Location":"Location","CreationDate":"Creation date","ILCD_CONNECTION_WORKS_MSG":"\"Connection works.\"","Monthly":"Monthly","DBImportUpdateDatabaseQuestion":"In order to run the import you need to update the source database. Do you want to do this?","ShowValues":"Show values","ExportDataSetsInOneFile":"Export all data sets into one file","Goal":"Goal","ILCDNetworkExportDescription":"Export processes or product systems to an ILCD network.","NumberOfIterations":"Number of iterations:","RelativeLciaResultsBarChart":"Relative LCIA results - bar chart","Database":"Database","NewDatabase_NameToShort":"The database name must have at least 4 characters","RemoveSelected":"Remove selected","NewProcess":"New process","TargetAmount":"Target amount","Synonyms":"Synonyms","Causal":"Causal","CASNumber":"CAS number","FormulaEvaluationFailed":"Formula evaluation failed","Connect":"Connect","SelectRecipients":"Select recipients","Locations":"Locations","Local":"Local","Grouping":"Grouping","InvalidAllocationFactorMessage":"An allocation factor should have a value between 0 and 1.","GeometricStandardDeviation":"Geometric standard deviation","MaximizeAll":"Maximize all","ImpactAssessmentMethod":"Impact assessment method","ProductSystemExcelExport":"Product system Excel export","DataGenerator":"Data generator","Country":"Country","Show":"show","SystemProcess":"System process","ImpactCategories":"Impact categories","SankeyDiagram":"Sankey diagram","UpdatePreferences":"Update preferences","Description":"Description","Help":"\u0026Help","FlowResults":"Flow results","UpdateDatabase":"Update database","German":"German","PedigreeUncertainty":"Pedigree uncertainty","RemoteDatabase":"Remote database","SetSankeyDiagramOptions":"Set sankey diagram options","Export":"Export...","CreateDatabase":"Create database","NormalizationWeightingSets":"Normalization and weighting sets","AdditionalInformation":"Additional information","DecimalSeparator":"Decimal separator","ImpactAssessmentMethods":"Impact assessment methods","InvalidFormula":"Invalid formula","Reference":"Reference","CreateDefaultValuesForMissingFields":"Create default values for missing fields","Sankey_ScaleDescription":"Process colour scale (contributions in [%])","ExportToExcel":"Export to Excel","ImportILCD":"Import ILCD","Type":"Type","CannotDelete":"Cannot delete","Tab":"Tab","Results":"Results","None":"None","Geography":"Geography","PleaseEnterANewName":"Please enter a new name","SearchProvidersFor":"Search providers for","ILCDNetworkExport":"ILCD Network Export","FailedToLoadFlowProperty":"Failed to load flow property","GoalAndScope":"Goal and scope","StartDate":"Start date","Formula":"Formula","FunctionalUnit":"Functional unit","Input":"Input","Maximum":"Maximum","CloseDatabase":"Close database","Technology":"Technology","DataCompleteness":"Data completeness","PleaseEnterAName":"Please enter a name","SelectAUserInterfaceLanguage":"Select a user interface language","Tree":"tree","NoExportFilesSelected":"No export files selected","Hourly":"Hourly","FileDoesNotExist":"File does not exist","IsReference":"Is reference","NormalizationFactor":"Normalization factor","CreatingProductSystem":"Creating product system","FoundProblems":"Found problems:","SaveAsImage":"Save as image","RunCalculation":"Run calculation","Units":"Units","SolvingProblems":"Solving problems","Copy":"Copy","Content":"Content","PleaseSpecifyUser":"Please specify a user","InfrastructureFlow":"Infrastructure flow","Methods":"Methods","Mean":"Mean","Uncertainty":"Uncertainty","Category":"Category","User":"User","UpdateMajorVersion":"Update major version","NewCategory":"new category","NewUnitGroup":"New unit group","FormulaInterpreter":"Formula interpreter","NeedOpenDatabase":"You need to open a database.","Source":"Source","SearchParameters":"Search parameters","CannotDeleteRefFlowMessage":"You cannot delete the reference flow of a process","MoveUp":"Move up","Move":"move","PedigreeMatrixMessage":"Click on the matrix cells to select entries","ExportMatrix":"Export matrix","MonteCarloSimulation":"Monte Carlo Simulation","QuantitativeReference":"Quantitative reference","NewDatabase":"New database","NewFlow":"New flow","ReportView":"Report view","Change":"Change","OpenMiniatureView":"Open miniature view","IndicatorBarChart":"Indicator bar chart","InitializeSimulation":"Initialize simulation","InvalidAllocationFactor":"Invalid factor","ResultsOfProject":"Results of project:","DataTreatment":"Data treatment","ProcessEvaluationAndValidation":"Process evaluation and validation","NoCostCategorySelected":"No cost category selected","SubCategory":"Sub-category","LciaResultTable":"LCIA result table","Welcome":"Welcome","DefaultProvider":"Default provider","Contribution":"Contribution","LayoutAs":"Layout as {0}"})});
+		
+    </script>
+</body>
+</html>
